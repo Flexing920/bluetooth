@@ -1,0 +1,130 @@
+input[type="number"] {
+  max-width: 80%;
+}
+
+ .outer {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: scroll;
+  padding: 0;
+}
+
+ .inner {
+  position: relative;
+  width: 50%;
+  top: 50%;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+  padding: 0;
+}
+
+/* Customize fonts */
+body, label, input, button, select { 
+  font-family: 'Helvetica Neue', Helvetica;
+  font-weight: 200;
+}
+h1, h2, h3, h4 { font-weight: 400; }
+
+#controls {
+  /* Appearance */
+  background-color: white;
+  padding: 0 20px 20px 20px;
+  cursor: move;
+  /* Fade out while not hovering */
+  opacity: 0.85;
+  zoom: 0.9;
+  transition: opacity 500ms 1s;
+}
+#controls:hover {
+  /* Fade in while hovering */
+  opacity: 0.95;
+  transition-delay: 0;
+}
+
+/* Position and style citation */
+#cite {
+  position: absolute;
+  bottom: 10px;
+  left: 50px;
+  font-size: 12px;
+}
+
+
+
+/* If not using map tiles, show a white background */
+.leaflet-container {
+  background-color: white !important;
+}
+
+/* Format progress bar */
+
+.shiny-progress-container {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 2000;
+}
+
+.shiny-progress .progress {
+    position: absolute;
+    width: 100%;
+    top: 0;
+    /* The default height is only 1px which is find to be TINY */
+    height: 8px;
+    margin: 0;
+}
+
+.shiny-progress .bar {
+    background-color: #FF0000;
+    .opacity = 0.8;
+    transition-duration: 250ms;
+}
+
+.shiny-progress .progress-text {
+    position: absolute;
+    right: 30px;
+    height: 30px;
+    width: 490px;
+    background-color: #D9534F;
+    padding-top: 2px;
+    padding-right: 3px;
+    padding-bottom: 2px;
+    padding-left: 3px;
+    opacity: 0.95;
+    /* I also wanted to round off the corners of the text box */
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+}
+
+.progress-text {
+    /* Copy the below to vertically center the progress bar text box in the shiny dashboard header */
+    /* !important is crucial here otherwise it gets overridden by the dreaded element.style */
+    top: 15px !important;
+    color: #FFFFFF !important;
+    text-align: center;
+}
+
+/* Bold Initial part of message */
+.shiny-progress .progress-text .progress-message {
+    padding-top: 0;
+    padding-right: 3px;
+    padding-bottom: 3px;
+    padding-left: 10px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+/* Message detail */
+.shiny-progress .progress-text .progress-detail {
+    padding-top: 0;
+    padding-right: 3px;
+    padding-bottom: 3px;
+    padding-left: 3px;
+    font-size: 17px;
+}
