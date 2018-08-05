@@ -1,0 +1,9 @@
+name: Bluetooth_Travel_Times
+account: nmc-data
+server: shinyapps.io
+appId: 152828
+bundleId: 733381
+url: https://nmc-data.shinyapps.io/Bluetooth_Travel_Times/
+when: 1488582277.61706
+asMultiple: FALSE
+asStatic: FALSE
