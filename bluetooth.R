@@ -1,5 +1,6 @@
 ####Import packages
 library("RPostgreSQL")
+library(plyr)
 library(dplyr)
 library(ggplot2)
 
@@ -55,7 +56,7 @@ get_tt_threshold_from_db <- function(sensor_ip_1, sensor_ip_2, tt_factor){
   
   df <- call_db("select * from segment_table;")
   ## Get the subset of records from the given sensors
-  df <- df %>% filter((ip_1==sensor_ip_1 & ip_2==sensor_ip_2) |
+  df <- df %>% dplyr::filter((ip_1==sensor_ip_1 & ip_2==sensor_ip_2) |
                           (ip_1==sensor_ip_2 & ip_2==sensor_ip_1))
   ## Get the tt_average
   tt_average <- df$travel_time
@@ -73,8 +74,8 @@ get_tt_threshold_from_db <- function(sensor_ip_1, sensor_ip_2, tt_factor){
 get_sensors_given_corridor <- function(corr_name){
   
   sensors <- call_db("select * from intersections") %>%
-    filter(corridor==corr_name) %>%
-    mutate(seq = as.integer(sequence))
+    dplyr::filter(corridor==corr_name) %>%
+    dplyr::mutate(seq = as.integer(sequence))
   
   return(sensors)
 }
@@ -86,8 +87,8 @@ get_all_sensors_of_a_corridor <- function(corr_name, ip_1, ip_2){
   
   sensors <- get_sensors_given_corridor(corr_name)
   
-  seq_sensor_1 <- sensors %>% filter(db_ip==ip_1) %>% select(seq)
-  seq_sensor_2 <- sensors %>% filter(db_ip==ip_2) %>% select(seq)
+  seq_sensor_1 <- sensors %>% dplyr::filter(db_ip==ip_1) %>% dplyr::select(seq)
+  seq_sensor_2 <- sensors %>% dplyr::filter(db_ip==ip_2) %>% dplyr::select(seq)
   seq_1 <- min(seq_sensor_1, seq_sensor_2)
   seq_2 <- max(seq_sensor_1, seq_sensor_2)
   
@@ -134,11 +135,11 @@ call_traffic_data <- function(corr_name, ip_1, ip_2, date_1, date_2){
 set_od_pair <- function(traffic_data) {
   
   traffic_data <- traffic_data %>% 
-    arrange(mac_address, first_time) %>%
-    select(ip, first_time, location, mac_address, seq) ## Adjust later if we need period information
+    dplyr::arrange(mac_address, first_time) %>%
+    dplyr::select(ip, first_time, location, mac_address, seq) ## Adjust later if we need period information
   
-  origin <- traffic_data %>% slice(1:(n()-1))
-  dest <- traffic_data %>% slice(2:n())
+  origin <- traffic_data %>% dplyr::slice(1:(n()-1))
+  dest <- traffic_data %>% dplyr::slice(2:n())
   
   origin <- setNames(origin,c("ip_o","time_o","location_o","mac_o","seq_o"))
   dest <- setNames(dest,c("ip_d","time_d","location_d","mac_d","seq_d"))
@@ -163,7 +164,7 @@ set_od_pair <- function(traffic_data) {
 set_new_cols <- function(od, tt_t_1, tt_t_2, temp_agg) {
   
   od <- od %>% 
-    mutate(ttime = time_d-time_o, 
+    dplyr::mutate(ttime = time_d-time_o, 
            dir = ifelse(seq_d-seq_o==1, "Direction 1", "Direction -1"),
            full_day = weekdays(time_o),
            day_type = ifelse(full_day =="Saturday" | 
@@ -171,12 +172,12 @@ set_new_cols <- function(od, tt_t_1, tt_t_2, temp_agg) {
            d_time = strptime(time_o,"%Y-%m-%d %H:%M:%S")$hour*60+
                     strptime(time_o,"%Y-%m-%d %H:%M:%S")$min,
            tod = cut(d_time,breaks=c(seq(0,1440,temp_agg/60)))) %>%
-    filter((as.numeric(ttime, units = "secs") < tt_t_1 & dir == "Direction 1") | 
+    dplyr::filter((as.numeric(ttime, units = "secs") < tt_t_1 & dir == "Direction 1") | 
           (as.numeric(ttime, units = "secs") < tt_t_2 & dir == "Direction -1"))
   
   od$ttime <- as.numeric(od$ttime, units="secs")  
   
-  od$tod <- mapvalues(od$tod, 
+  od$tod <- plyr::mapvalues(od$tod, 
                       from = levels(od$tod), 
                       to=set_x_levels(3600))
   
@@ -189,8 +190,8 @@ apply_mad <- function(od_edit, mad_factor){
   
 
   od_aggregate <- od_edit %>% 
-    group_by(tod, ip_o, ip_d, dir, day_type) %>% 
-    summarize(ttime_median=median(ttime), 
+    dplyr::group_by(tod, ip_o, ip_d, dir, day_type) %>% 
+    dplyr::summarize(ttime_median=median(ttime), 
               ttime_mad = mad(ttime), 
               ttime_count = length(ttime))
   
@@ -206,7 +207,7 @@ apply_mad <- function(od_edit, mad_factor){
                  od_mad$ttime>=od_mad$ttime_median-
                  od_mad$ttime_mad*1.4826*mad_factor]<-"Valid"
   
-  return(od_mad %>% filter(valid=="Valid"))
+  return(od_mad %>% dplyr::filter(valid=="Valid"))
 }
 
 
@@ -245,8 +246,8 @@ fill_missing_data <- function(df, ip_1, ip_2, tt_factor, temp_agg){
 segment_agg <- function(od_after_mad, ip_1, ip_2, tt_factor, temp_agg){
   
   od_mad_agg <- od_after_mad %>% 
-    group_by(tod, ip_o, ip_d, dir, day_type) %>% 
-    summarize(ttime_average=as.integer(mean(ttime)),
+    dplyr::group_by(tod, ip_o, ip_d, dir, day_type) %>% 
+    dplyr::summarize(ttime_average=as.integer(mean(ttime)),
               ttime_count = length(ttime))
   
   od_mad_agg_na_omit <- na.omit(od_mad_agg)
@@ -293,7 +294,7 @@ apply_2point_corridor <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_faco
     sensor_ip_2 <- all_sensors_ip[i+1]
     single_2point_data_after_mad <- single_2point(corr_name, sensor_ip_1, sensor_ip_2, date_1, date_2, tt_facor, temp_agg, mad_factor)
     single_2point_data_after_mad_agg <- segment_agg(single_2point_data_after_mad, sensor_ip_1, sensor_ip_2, tt_facor, temp_agg) %>% 
-      arrange(tod, day_type, dir) %>% mutate(seg_id=paste0("seg_", seg_num))
+      dplyr::arrange(tod, day_type, dir) %>% dplyr::mutate(seg_id=paste0("seg_", seg_num))
     # print(paste("num of columns of single_2point_agg: ", ncol(single_2point_data_after_mad_agg)))
     # print(head(single_2point_data_after_mad_agg))
     df_agg <- df_agg %>% rbind.data.frame(single_2point_data_after_mad_agg)
@@ -421,10 +422,9 @@ call_traffic_data_4point <- function(corr_name, ip_1, ip_2, date_1, date_2){
     # print(head(traffic_data_merge_sequence))
   }
   
-  return(traffic_data_merge_sequence %>% arrange(mac_address, first_time))
+  return(traffic_data_merge_sequence %>% dplyr::arrange(mac_address, first_time))
 }
 
-# test_call_traffic_data_4point <- call_traffic_data_4point(cor_name, ip_1, ip_2, d_1, d_2)
 
 single_4point <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_factor, temp_agg, mad_factor){
 
@@ -438,16 +438,18 @@ single_4point <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_factor, temp
   } else {
     print(paste("For segment: ", ip_1, ip_2))
     print("4point method can be used")
-    traffic_data <- call_traffic_data_4point(corr_name, ip_1, ip_2, date_1, date_2) %>% select(-last_time)
+    traffic_data <- call_traffic_data_4point(corr_name, ip_1, ip_2, date_1, date_2) %>% dplyr::select(-last_time)
     
     seq_list <- get_seq_of_sensors_for_4point(corr_name, ip_1, ip_2)
-    df <- data.frame()
-    df <- clean_data_asc(traffic_data, df, seq_list, 600)
-    df <- clean_data_desc(traffic_data, df, seq_list, 600)
+    df_clean <- clean_data(traffic_data, seq_list)
+    df <- df_clean
+    # df <- data.frame()
+    # df <- clean_data_asc(traffic_data, df, seq_list, 600)
+    # df <- clean_data_desc(traffic_data, df, seq_list, 600)
     
     if (nrow(df)){
       od_pair_df <- set_od_pair(df) %>% 
-        filter((seq_o==seq_list[2] & seq_d==seq_list[3]) | 
+        dplyr::filter((seq_o==seq_list[2] & seq_d==seq_list[3]) | 
                  (seq_o==seq_list[3] & seq_d==seq_list[2]))
       if (nrow(od_pair_df)){
         tt_t_1 <- get_tt_threshold_from_db(ip_1, ip_2, tt_factor)
@@ -596,6 +598,120 @@ clean_data_desc <- function(all_points_1, all_points_2, seq_list, tt_threshold){
   return(all_points_2)
 }
 
+## This function is used to find the rows pattern which seq follows 1,2...2,3...3,4
+find_pattern_asc <- function(subset_data, sequence_list){
+  out_df <- data.frame()
+  # Get min/max seq
+  seq_1 <- min(sequence_list)
+  seq_2 <- max(sequence_list)
+  
+  # Check if there are 4 seqs
+  if(length(unique(subset_data$seq))==4){
+    # Get the first row in the df which seq==seq_1
+    temp_ind <- min(which(subset_data$seq==seq_1))
+    one_row <- subset_data[temp_ind,]
+    # Add the row to the end of the df, so the following method can be used 
+    # thru all df
+    df <- rbind(subset_data, one_row)
+    
+    # Get the indecies of seq_1
+    index_1 <- which(df$seq==seq_1)
+    
+    # Get the length of the index list of seq_1
+    n <- length(index_1)
+    
+    # Loop through the df to get the rows between two adjacent indices of seq_1
+    for (i in 1:(n-1)){
+      if(index_1[i+1]-index_1[i]>=3){
+        df_sub <- df[index_1[i]:(index_1[i+1]-1),]
+        if(length(unique(df_sub$seq))==4){
+          # Get the first index which seq==seq_2
+          first_ind <- min(which(df_sub$seq==seq_2))
+          # Subset df
+          df_sub <- df_sub[1:first_ind,]
+          # Check if seq follows 1,2...2,3...3,4
+          if(all(diff(df_sub$seq)>=0) & length(unique(df_sub$seq))==4){
+            m <- nrow(df_sub)
+            df_sub <- df_sub[, c("ip", "first_time", "location", "mac_address", "seq")]
+            df_1 <- df_sub[1:(m-1),]
+            df_1 <- setNames(df_1, c("ip_o","time_o","location_o","mac_o","seq_o"))
+            df_2 <- df_sub[2:m,]
+            df_2 <- setNames(df_2, c("ip_d","time_d","location_d","mac_d","seq_d"))
+            df_3 <- cbind(df_1, df_2)
+            df_3$ttime <- df_3$time_d-df_3$time_o
+            if(all(as.numeric(df_3$ttime, units="secs")<=(600))){
+              out_df <- rbind.data.frame(out_df, df_sub)
+              # out_df <- out_df %>% dplyr::filter((seq_o==3 & seq_d==2) | (seq_o==2 & seq_d==3))
+            }
+          }
+        }
+      }
+    }
+  }
+  return(out_df)
+}
+
+## This function is used to find the rows pattern which seq follows 4,3...3,2...2,1
+find_pattern_des <- function(subset_data, sequence_list){
+  out_df <- data.frame()
+  # Get min/max seq
+  seq_1 <- max(sequence_list)
+  seq_2 <- min(sequence_list)
+  
+  # Check if there are 4 seqs
+  if(length(unique(subset_data$seq))==4){
+    # Get the first row in the df which seq==seq_1
+    temp_ind <- min(which(subset_data$seq==seq_1))
+    one_row <- subset_data[temp_ind,]
+    # Add the row to the end of the df, so the following method can be used 
+    # thru all df
+    df <- rbind(subset_data, one_row)
+    
+    # Get the indecies of seq_1
+    index_1 <- which(df$seq==seq_1)
+    
+    # Get the length of the index list of seq_1
+    n <- length(index_1)
+    
+    # Loop through the df to get the rows between two adjacent indices of seq_1
+    for (i in 1:(n-1)){
+      if(index_1[i+1]-index_1[i]>=3){
+        df_sub <- df[index_1[i]:(index_1[i+1]-1),]
+        if(length(unique(df_sub$seq))==4){
+          # Get the first index which seq==seq_2
+          first_ind <- min(which(df_sub$seq==seq_2))
+          # Subset df
+          df_sub <- df_sub[1:first_ind,]
+          # Check if seq follows 1,2...2,3...3,4
+          if(all(diff(df_sub$seq)<=0) & length(unique(df_sub$seq))==4){
+            m <- nrow(df_sub)
+            df_sub <- df_sub[, c("ip", "first_time", "location", "mac_address", "seq")]
+            df_1 <- df_sub[1:(m-1),]
+            df_1 <- setNames(df_1, c("ip_o","time_o","location_o","mac_o","seq_o"))
+            df_2 <- df_sub[2:m,]
+            df_2 <- setNames(df_2, c("ip_d","time_d","location_d","mac_d","seq_d"))
+            df_3 <- cbind(df_1, df_2)
+            df_3$ttime <- df_3$time_d-df_3$time_o
+            if(all(as.numeric(df_3$ttime, units="secs")<=(600))){
+              out_df <- rbind.data.frame(out_df, df_sub)
+              # out_df <- out_df %>% dplyr::filter((seq_o==3 & seq_d==2) | (seq_o==2 & seq_d==3))
+            }
+          }
+        }
+      }
+    }
+  }
+  return(out_df)
+}
+
+clean_data <- function(traffic_data_4point, sequence_list){
+  df_list <- split(traffic_data_4point, traffic_data_4point$mac_address)
+  out_df_1 <- lapply(df_list, find_pattern_asc, sequence_list) %>% dplyr::bind_rows()
+  out_df_2 <- lapply(df_list, find_pattern_des, sequence_list) %>% dplyr::bind_rows()
+  out_df <- rbind.data.frame(out_df_1, out_df_2)
+  return(out_df)
+}
+
 # Test single_4point
 # Compare the amount of records from two methods
 # Hugh differences in terms of amount of records mean the results could be deviated if we only use 2point_method
@@ -623,7 +739,7 @@ clean_data_desc <- function(all_points_1, all_points_2, seq_list, tt_threshold){
 
 apply_4point_corridor <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_facor, temp_agg, mad_factor){
   all_sensors <- get_all_sensors_of_a_corridor(corr_name, ip_1, ip_2) %>%
-    arrange(seq)
+    dplyr::arrange(seq)
 
   all_sensors_ip <- all_sensors$db_ip
   print("All sensors ips along the corridor are: ")
@@ -638,7 +754,7 @@ apply_4point_corridor <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_faco
     sensor_ip_2 <- all_sensors_ip[i+1]
     single_4point_data_after_mad <- single_4point(corr_name, sensor_ip_1, sensor_ip_2, date_1, date_2, tt_facor, temp_agg, mad_factor)
     single_4point_data_after_mad_agg <- segment_agg(single_4point_data_after_mad, sensor_ip_1, sensor_ip_2, tt_facor, temp_agg) %>% 
-      arrange(tod, day_type, dir) %>% mutate(seg_id=paste0("seg_", seg_num))
+      dplyr::arrange(tod, day_type, dir) %>% dplyr::mutate(seg_id=paste0("seg_", seg_num))
     # print(paste("num of columns of single_4point_agg: ", ncol(single_4point_data_after_mad_agg)))
     # print(head(single_4point_data_after_mad_agg))
     df_agg <- df_agg %>% rbind.data.frame(single_4point_data_after_mad_agg)
@@ -654,6 +770,25 @@ apply_4point_corridor <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_faco
   return(df_agg)
 }
 
+
+show_segment_info <- function(cor, df_corridor){
+  df <- subset(df_corridor, select=c("ip_o", "ip_d", "dir", "seg_id"))
+  df <- unique(df)
+  colnames(df)[which(names(df) == "ip_o")] <- "ip_origin"
+  colnames(df)[which(names(df) == "ip_d")] <- "ip_destination"
+  sequence_table <- call_db("select * from sequence_table;")
+  sub_sequence_table <- sequence_table[sequence_table$corridor==cor,]
+  # 
+  # 
+  df <- merge(x=df, y=sub_sequence_table[, c("db_ip", "location")], by.x="ip_origin", by.y="db_ip", all.x=TRUE)
+  colnames(df)[which(names(df) == "location")] <- "location_origin"
+  df <- merge(x=df, y=sub_sequence_table[, c("db_ip", "location")], by.x="ip_destination", by.y="db_ip", all.x=TRUE)
+  colnames(df)[which(names(df) == "location")] <- "location_destination"
+  
+  # df <- df[with(df, order(seg_id, dir))]
+  df <- df %>% dplyr::arrange(seg_id, dir)
+  return(df)
+}
 
 # # weekday should be 0 or 1
 # # 1 means data only contains records for weekdays
@@ -724,9 +859,9 @@ apply_4point_corridor <- function(corr_name, ip_1, ip_2, date_1, date_2, tt_faco
   
 
 #Test
-cor_name <- "Burnet"
-i_1 <- "172.16.29.23" # Burnet @ Braker
-i_2 <- "172.16.28.20" # Burnet @ Anderson
+# cor_name <- "Burnet"
+# i_1 <- "172.16.29.27" # Burnet @ Braker
+# i_2 <- "172.16.79.23" # Burnet @ Anderson
 
 # cor_name <- "Lamar"
 # i_1 <- "172.16.179.35"
@@ -735,10 +870,13 @@ i_2 <- "172.16.28.20" # Burnet @ Anderson
 # # Data will be missing from other period. Need be careful of choosing period
 # # to avoid error of code.
 # d_1 <- "2016-04-08"
-# d_2 <- "2016-04-30"
+# d_2 <- "2016-05-10"
 # tt_fac <- 5
 # t_agg <- 3600
 # mad_fac <- 5
+
+# single_4point_test <- single_4point(cor_name, i_1, i_2, d_1, d_2, tt_fac, t_agg, mad_fac)
+
 # #
 # #
 # test_apply_4point_corridor <- apply_4point_corridor(cor_name, i_1, i_2, d_1, d_2, tt_fac, t_agg, mad_fac)
@@ -772,38 +910,6 @@ i_2 <- "172.16.28.20" # Burnet @ Anderson
 # 
 # write.csv(test_segment, file = "MyData.csv")
 
-show_segment_info <- function(cor, df_corridor){
-  df <- subset(df_corridor, select=c("ip_o", "ip_d", "dir", "seg_id"))
-  df <- unique(df)
-  colnames(df)[which(names(df) == "ip_o")] <- "ip_origin"
-  colnames(df)[which(names(df) == "ip_d")] <- "ip_destination"
-  sequence_table <- call_db("select * from sequence_table;")
-  sub_sequence_table <- sequence_table[sequence_table$corridor==cor,]
-  # 
-  # 
-  df <- merge(x=df, y=sub_sequence_table[, c("db_ip", "location")], by.x="ip_origin", by.y="db_ip", all.x=TRUE)
-  colnames(df)[which(names(df) == "location")] <- "location_origin"
-  df <- merge(x=df, y=sub_sequence_table[, c("db_ip", "location")], by.x="ip_destination", by.y="db_ip", all.x=TRUE)
-  colnames(df)[which(names(df) == "location")] <- "location_destination"
 
-  # df <- df[with(df, order(seg_id, dir))]
-  df <- df %>% dplyr::arrange(seg_id, dir)
-  return(df)
-}
 
-# t <- show_segment_info("Burnet", test_apply_4point_corridor)
 
-# weekday <- 1
-# a <- test_apply_4point_corridor
-# 
-# if(weekday==1){
-#   a <- a[a$day_type=="Weekday", ]
-# } else if (weekday==0) {
-#   a <- a[a$day_type=="Weekend", ]
-# } else {
-#   print("Please specify the weekday value: 1 means weekday, 0 means weekend.")
-# }
-# 
-# a <- a[a$ttime_count<=1, ]
-# num_sub_df <- nrow(a)
-# num_sub_agg_data <- nrow(corridor_agg_data)

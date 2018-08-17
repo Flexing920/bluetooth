@@ -66,8 +66,7 @@ ui <- fluidPage(
 								choices = blue_corrNames,
 								selected = blue_corrNames[1]
 
-								),
-							submitButton("Submit")
+								)
 
 							),
 
@@ -83,8 +82,7 @@ ui <- fluidPage(
 								start = "2016-04-08",
 								end = "2016-04-20"
 
-								),
-							submitButton("Submit")
+								)
 
 							)
 
