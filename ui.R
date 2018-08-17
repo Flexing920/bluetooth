@@ -56,72 +56,6 @@ ui <- fluidPage(
 					
 					),
 
-				tabPanel("Travel Time", value = 'travel_time_tab',
-
-					fluidRow(
-
-						column(5, offset=1,
-
-							selectInput("blue_corridor", h5("Corridors"),
-								choices = blue_corrNames,
-								selected = blue_corrNames[1]
-
-								)
-
-							),
-
-						column(6, 
-
-							dateRangeInput("blue_dates", h5("Choose a date range"),
-								start="2016-04-08",
-								end = "2016-04-20"
-
-								),
-
-							dateRangeInput("blue_dates2", h5("Choose a second date range"),
-								start = "2016-04-08",
-								end = "2016-04-20"
-
-								)
-
-							)
-
-						),
-
-					fluidRow(
-
-						plotOutput("blue_plot1"),
-
-						tags$br(),
-						tags$br(),
-						tags$br(),
-
-						plotOutput("blue_plot2"),
-
-						tags$br(),
-						tags$br(),
-						tags$br(),
-
-						h2("Segment Information Table"),
-						DT::dataTableOutput("segment_info"),
-						
-						tags$br(),
-						tags$br(),
-						tags$br(),
-						
-						h2("Segment Travel Time Table for Period 1"),
-						DT::dataTableOutput("segment_travel_time_1"),
-
-						tags$br(),
-						tags$br(),
-						tags$br(),
-						
-						h2("Segment Travel Time Table for Period 2"),
-						DT::dataTableOutput("segment_travel_time_2")
-						)
-
-					),
-
 				tabPanel("Traffic Volume", value = 'traffic_volume_tab',
 
 					tags$br(),
@@ -313,31 +247,97 @@ ui <- fluidPage(
 
 					),
 
-				tabPanel("Transit", value = 'transit_tab',
+
+				tabPanel("Travel Time", value = 'travel_time_tab',
 
 					fluidRow(
 
-						column(2, offset = 1,
+						column(5, offset=1,
 
-							radioButtons("transit_analysis",
-
-								h5("Analysis Type"),
-
-								choices = list("Dwell Time" = 'dwell_time',
-									"Occupancy" = "occupancy",
-									"Transit Speed" = 'transit_speed',
-									"Boardings and Alightings" = 'on_off'),
-								selected = 'on_off'
+							selectInput("blue_corridor", h5("Corridors"),
+								choices = blue_corrNames,
+								selected = blue_corrNames[1]
 
 								)
 
 							),
 
-						column(5,
+						column(6, 
 
-							selectInput("apc_chosen_corr", h5("Choose Corridor"), 
-								choices= apc_corr, selected = apc_corr[[1]])
+							dateRangeInput("blue_dates", h5("Choose a date range"),
+								start="2016-04-08",
+								end = "2016-04-30"
 
+								),
+
+							dateRangeInput("blue_dates2", h5("Choose a second date range"),
+								start = "2016-04-08",
+								end = "2016-04-30"
+
+								)
+
+							)
+
+						),
+
+					fluidRow(
+
+					  plotOutput("blue_plot1"),
+					  
+					  tags$br(),
+					  tags$br(),
+					  tags$br(),
+					  
+					  plotOutput("blue_plot2"),
+					  
+					  tags$br(),
+					  tags$br(),
+					  tags$br(),
+					  
+					  h2("Segment Information Table"),
+					  DT::dataTableOutput("segment_info"),
+					  
+					  tags$br(),
+					  tags$br(),
+					  tags$br(),
+					  
+					  h2("Segment Travel Time Table for Period 1"),
+					  DT::dataTableOutput("segment_travel_time_1"),
+					  
+					  tags$br(),
+					  tags$br(),
+					  tags$br(),
+					  
+					  h2("Segment Travel Time Table for Period 2"),
+					  DT::dataTableOutput("segment_travel_time_2")
+
+
+						)
+
+					),
+
+				tabPanel("Transit", value = 'transit_tab',
+
+					fluidRow(
+
+						column(9, offset = 1,
+
+							tags$br(),
+
+							radioButtons("transit_analysis",
+
+								h5("Analysis Type"),
+
+								choices = list(
+									"Boardings and Alightings" = 'on_off',
+									"Dwell Time" = 'dwell_time',
+									"Transit Speed" = 'transit_speed',
+									"Occupancy" = "occupancy"),
+
+								selected = 'on_off',
+								inline=TRUE
+
+								)
 
 							)
 
@@ -357,7 +357,7 @@ ui <- fluidPage(
 
 						conditionalPanel(condition="input.transit_analysis == 'dwell_time'",
 
-							plotOutput("apc_dwell_plot")
+							plotOutput("dwell_plot")
 
 							),
 
@@ -374,7 +374,7 @@ ui <- fluidPage(
 							),
 						conditionalPanel(condition="input.transit_analysis == 'on_off'",
 
-							plotOutput("apc_plot")
+							plotOutput("apc_volume_plot")
 
 							)
 
@@ -387,7 +387,7 @@ ui <- fluidPage(
 
 		column(6,
 
-			leafletOutput("map", height=400),
+			leafletOutput("map", height=550),
 
 			tags$br(),
 			tags$hr(),
@@ -401,9 +401,9 @@ ui <- fluidPage(
 
 				downloadButton("download_study", "Download Counts"),
 
-				DT::dataTableOutput("data_access_table")
+				DT::dataTableOutput("data_access_table"),
 
-				# textOutput("int_filename_class")
+				textOutput("clicked_info")
 
 
 				)

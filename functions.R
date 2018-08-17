@@ -11,116 +11,6 @@ library(ggplot2)
 library(scales)
 library(dplyr)
 
-###################### Functions #######################
-subset_data <- function(data, day, dir) {
-
-	# Select the corresponoding week
-
-	sunday <- floor_date(ymd(day),"week")
-	saturday <- as.Date(sunday) + 6
-
-	select_data <- data %>% mutate(date = as.Date(curdatetime)) %>%
-	filter(date >= sunday & date <= saturday) %>% filter(direction == dir) %>%
-	select(curdatetime, speed, volume)
-
-	week_data <- select_data %>% group_by(curdatetime) %>% summarize(sum_vol=sum(na.omit(volume)))
-	aux_speed <- select_data %>% group_by(curdatetime) %>% summarize(ave_speed=mean(na.omit(speed)))
-	week_data$ave_speed <- ifelse(aux_speed$ave_speed > 65, 30, aux_speed$ave_speed)
-
-	return(week_data)
-
-}
-
-
-process_data <- function(week_data){
-  # Function process volume and data from sensors  
-  # and select a specific week (sunday to saturday) and 
-  # specific intersection and direction to show
-  # Input
-  #       day: Day of the week to show in POSIXt "%Y:%m:%d"
-  #       int: Intersection name in "character"
-  #       dir: Traffic direction in "character" ---> note: EB, WB, NB, SB and None directions available
-  # Output
-  #       week_data: processed volume and speed data for 
-  #                   the corresponding week as a "list"
-  
-  week_data <- week_data %>% 
-    mutate(date = as.Date(curdatetime)) %>%
-    mutate(wday = wday(date)) %>%
-    mutate(hour = format(week_data$curdatetime, format = "%H:%M:%S")) %>%
-    mutate(hour = as.POSIXct(hour, format = "%H:%M:%S")) 
-  
-  week_data <- arrange(week_data, curdatetime) %>% group_by(date)
-  
-  #Estimate hourly volume and speed 
-  week_data$hourlyvolume <- c(NA, NA, rollapply(week_data$sum_vol, 4, sum), NA)
-  week_data$hourlyspeed <- c(NA, NA, rollmean(week_data$ave_speed, 4), NA)
-  
-  return(week_data)
-
-}
-
-vol_plot <- function(week_example, int, dir){
-  # Function to plot hourly volume of the selected week
-  # Input
-  #       day: Day of the week to show in POSIXt "%Y:%m:%d"
-  #       int: Intersection name in "character"
-  #       dir: Traffic direction in "character"
-  # Output
-  #       figure: plot of hourly-volume per day hour for the seven days
-  
-  # Volumen plot
-
-  plot_data <- subset(week_example, !(wday %in% c(1, 7)))
-  plot_data <- subset(plot_data, hour >= as.POSIXct('5', format = "%H"))
-
-  p <- ggplot(data = plot_data, aes(x = hour, y = hourlyvolume, color = period)) + 
-    ggtitle(paste(int, "-", dir)) + ylab("Volume (vph)") +
-    scale_x_datetime(name = "Hour", date_breaks = "1 hour", labels = date_format("%H:%M")) + 
-    stat_summary(fun.data=mean_se, geom="errorbar") + stat_summary(geom="line") +
-    stat_summary(geom="point")
-
-  p <- p + theme(axis.text.x = element_text(angle = 45, hjust = 1, size=11),
-    axis.title.x = element_text(size=16),
-    axis.text.y = element_text(size=11),
-    axis.title.y=element_text(size=16), plot.title=element_text(size=20, face='bold'))
-
-  p <- p + theme(legend.title=element_blank())
-
-  return(p)
-}
-
-speed_plot <- function(week_example, int, dir){
-  # Function to plot hourly-averaged speed of the selected week
-  # Input
-  #       day: Day of the week to show in POSIXt "%Y:%m:%d"
-  #       int: Intersection name in "character"
-  #       dir: Traffic direction in "character"
-  # Output
-  #       figure: plot of hourly-averaged speed per day hour for the seven days
-
-  
-  # Speed plot
-  plot_data <- subset(week_example, !(wday %in% c(1, 7)))
-  plot_data <- subset(plot_data, hour >= as.POSIXct('5', format = "%H"))
-
-  p <- ggplot(data = plot_data, aes(x = hour, y = hourlyspeed, color = period)) + 
-    ggtitle(paste(int, "-", dir)) + ylab("Speed (mph)") +
-    scale_x_datetime(name = "Hour", date_breaks = "1 hour", 
-      labels = date_format("%H:%M"), expand = c(0, 0)) + 
-    stat_summary(fun.data=mean_se, geom="errorbar") + stat_summary(geom="line") +
-    stat_summary(geom="point")
-
-  p <- p + theme(axis.text.x = element_text(angle = 45, hjust = 1, size=11),
-    axis.title.x = element_text(size=16),
-    axis.text.y = element_text(size=11),
-    axis.title.y=element_text(size=16), plot.title=element_text(size=20, face='bold'))
-
-  p <- p + theme(legend.title=element_blank())
-
-  return(p)
-}
-
 intersection_peak_filter <- function (data, peak_filter) {
 
   if (length(peak_filter) == 3) {
@@ -286,35 +176,11 @@ intersection_counts_filter <- function(data, counts_filter) {
 
 ################### APC functions ##############
 
-dwell_time_plot <- function(data, corr_name) {
-
-  pd <- position_dodge(0.1)
-
-  p <- ggplot(data=data, aes(x=hour, y=dwell_time, color=as.factor(year))) 
-  p <- p + geom_line(size=1.5) 
-  p <- p + geom_line(aes(y = dwell_time - error), linetype='dotted')
-  p <- p + geom_line(aes(y = dwell_time + error), linetype='dotted')
-  p <- p + xlab("Hour") + scale_x_continuous(breaks=c(0:23))
-  p <- p + scale_y_continuous(limits = c(0, 30), breaks=c(0:5 * 5))
-  p <- p + ggtitle(paste(corr_name, ' Corridor Weekday Dwell Time by Hour')) + ylab("Dwell Time (mins)")
-  p <- p + scale_fill_discrete(name= "Year")
-  p <- p + theme(axis.text.x = element_text(size=14), plot.title=element_text(hjust = 0.5, size=18),
-    axis.text.y= element_text(size=14), legend.title=element_blank(), legend.text=element_text(size=14),
-    axis.title.y = element_text(size=16), axis.title.x = element_text(size=16))
-
-  return(p)
-
-}
+## plotting functions are currently in server file itself
 
 ################### New WAVE functions ##############
 
-# wave_speed_agg_clean <- function(data) {
 
-  
-
-#   return(data)
-
-# }
 
 wave_speed_process <- function(data) {
 
@@ -328,15 +194,19 @@ wave_speed_process <- function(data) {
   data$hourlyspeed <- c(NA, NA, rollmean(data$avg_speed, 4), NA)
   data$hourlyspeed_std <- c(NA, NA, rollapply(data$avg_speed, 4, sd), NA)
 
+  data <- subset(data, hour > 5)
+
   data$index <- 1:nrow(data)
+
 
   return(data) 
 }
 
 wave_speed_plot <- function(data, intname, direction) {
 
+
   q <- ggplot(data=data, aes(x=index, y=hourlyspeed, color=as.factor(period))) + geom_line() + geom_point()
-  q <- q + scale_x_continuous(limits=c(0, 96), breaks=1:12 * 8, labels=1:12 * 2,
+  q <- q + scale_x_continuous(limits=c(0, 72), breaks=0:3 * 24, labels=0:3 * 6 + 6,
     name="Time of Day", expand = c(0, 0))
   q <- q + geom_errorbar(aes(ymin=hourlyspeed - hourlyspeed_std, ymax=hourlyspeed + hourlyspeed_std))
   q <- q + theme(axis.text.x = element_text(size=11), 
@@ -361,15 +231,19 @@ wave_vol_process <- function(data) {
   data$hourlyvolume <- c(NA, NA, rollmean(data$avg_vol, 4), NA)
   data$hourlyvolume_std <- c(NA, NA, rollapply(data$avg_vol, 4, sd), NA)
 
+  data <- subset(data, hour > 5)
+
   data$index <- 1:nrow(data)
+
 
   return(data) 
 }
 
 wave_vol_plot <- function(data, intname, direction) {
+	  
 
   q <- ggplot(data=data, aes(x=index, y=hourlyvolume, color=as.factor(period))) + geom_line() + geom_point()
-  q <- q + scale_x_continuous(limits=c(0, 96), breaks=1:12 * 8, labels=1:12 * 2,
+  q <- q + scale_x_continuous(limits=c(0, 72), breaks=0:3 * 24, labels=0:3 * 6 + 6,
     name="Time of Day", expand = c(0, 0))
   q <- q + geom_errorbar(aes(ymin=hourlyvolume - hourlyvolume_std, ymax=hourlyvolume + hourlyvolume_std))
   q <- q + theme(axis.text.x = element_text(size=11), 

@@ -10,6 +10,7 @@ library(lubridate)
 library(zoo)
 library(ggplot2)
 library(scales)
+library(rpostgis)
 
 
 # The following script reads in HDR corrridor shapes (as shapes),
@@ -19,28 +20,13 @@ library(scales)
 # Further, processing in R is needed to create spatial
 # objects from geojson database information.
 
-############################# DATABASE CONNECTIONS ##############################
-pgis_parameters <- "PG:host='nmc-compute1.ctr.utexas.edu' dbname='coa_corridors' user='vista' password='vista00' port='5432'"
-corridors <- readOGR(dsn= pgis_parameters, layer="corridor_geom")
-
-corrNames <- as.character(corridors$corr_name)
-names(corrNames) <- corrNames # Getting corridor names as a named list to use in app
-
-corr_info <- subset(corridors@data, select = c("corr_id", "corr_name"))
+############################# ALL DATABASE CONNECTIONS MOVED TO SERVER ##############################
 
 ### Adding short names of the corridors
 corr_short_list <- c("Airport", "Burnet", "N. Lamar", "E. Riverside", 'E. MLK', 'S. Lamar', 'William\nCannon', 'Slaughter', "Guadalupe") 
 corr_id_list <- c(1, 2, 3, 4, 5, 6, 8, 9, 7)
 corr_short <- setNames(data.frame(cbind(corr_short_list, corr_id_list)), c("corr_short", "corr_id"))
 
-corr_info <- merge(corr_info, corr_short, by="corr_id")
-
-# #### DB connection
-# drv <- dbDriver("PostgreSQL")
-
-# con <- dbConnect(drv, dbname = "coa_corridors",
-#                  host = "nmc-compute1.ctr.utexas.edu", port = 5432,
-#                  user = "vista", password = "vista00")
 
 ###################### Wavetronix location and data matchups ################
 sensor_name <- c("BURNET RD / PALM WAY (IBM DRIVEWAY)", "BURNET RD / RUTLAND DR",
